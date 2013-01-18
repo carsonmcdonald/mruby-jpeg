@@ -7,6 +7,18 @@ Support for reading JPEGs in mruby using libjpeg.
 
 ## Installation
 
+In the mruby directory add the following to your build config:
+
+```ruby
+MRuby::Build.new do |conf|
+
+  conf.gem :git => 'git://github.com/carsonmcdonald/mruby-jpeg.git', :branch => 'master'
+
+end
+```
+
+or
+
 In the mruby directory:
 
 ```bash
