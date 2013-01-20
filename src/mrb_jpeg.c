@@ -113,11 +113,25 @@ mrb_jpeg_read(mrb_state *mrb, mrb_value self)
   struct RClass* class_jpeg_image = mrb_class_ptr(mrb_const_get(mrb, mrb_obj_value(module_jpeg), mrb_intern(mrb, "JPEGImage")));
   mrb_value ivar = mrb_class_new_instance(mrb, 0, NULL, class_jpeg_image);
   mrb_iv_set(mrb, ivar, mrb_intern(mrb, "data"), mrb_str_new(mrb, jpeg_data, scanline_size * dinfo.image_height));
+  mrb_iv_set(mrb, ivar, mrb_intern(mrb, "width"), mrb_fixnum_value(dinfo.image_width));
+  mrb_iv_set(mrb, ivar, mrb_intern(mrb, "height"), mrb_fixnum_value(dinfo.image_height));
 
   jpeg_finish_decompress(&dinfo);
   jpeg_destroy_decompress(&dinfo);
 
   return ivar;
+}
+
+static mrb_value
+mrb_jpeg_width_get(mrb_state *mrb, mrb_value self)
+{
+  return mrb_iv_get(mrb, self, mrb_intern(mrb, "width"));
+}
+
+static mrb_value
+mrb_jpeg_height_get(mrb_state *mrb, mrb_value self)
+{
+  return mrb_iv_get(mrb, self, mrb_intern(mrb, "height"));
 }
 
 static mrb_value
@@ -134,4 +148,6 @@ mrb_mruby_jpeg_gem_init(mrb_state* mrb)
 
   struct RClass *class_jpeg_image = mrb_define_class_under(mrb, module_jpeg, "JPEGImage", mrb->object_class);
   mrb_define_method(mrb, class_jpeg_image, "data", mrb_jpeg_data_get, ARGS_NONE());
+  mrb_define_method(mrb, class_jpeg_image, "width", mrb_jpeg_width_get, ARGS_NONE());
+  mrb_define_method(mrb, class_jpeg_image, "height", mrb_jpeg_height_get, ARGS_NONE());
 }
