@@ -151,3 +151,8 @@ mrb_mruby_jpeg_gem_init(mrb_state* mrb)
   mrb_define_method(mrb, class_jpeg_image, "width", mrb_jpeg_width_get, ARGS_NONE());
   mrb_define_method(mrb, class_jpeg_image, "height", mrb_jpeg_height_get, ARGS_NONE());
 }
+
+void
+mrb_mruby_jpeg_gem_final(mrb_state* mrb) 
+{
+}
