@@ -33,6 +33,38 @@
 
 #define HASH_TRUE(mrb, hash, value) (mrb_obj_equal(mrb, mrb_hash_get(mrb, hash, mrb_symbol_value(mrb_intern(mrb, value))), mrb_true_value()))
 
+enum decompress_type {FILE_SRC, MEMORY_SRC};
+
+const static JOCTET EOI_BUFFER[1] = { JPEG_EOI };
+
+static void init_source(j_decompress_ptr dinfo) { }
+
+static boolean fill_input_buffer(j_decompress_ptr dinfo)
+{
+  struct jpeg_source_mgr *source_mgr = (struct jpeg_source_mgr *)dinfo->src;
+  source_mgr->next_input_byte = EOI_BUFFER;
+  source_mgr->bytes_in_buffer = 1;
+  return TRUE;
+}
+
+static void skip_input_data(j_decompress_ptr dinfo, long num_bytes)
+{
+  struct jpeg_source_mgr *source_mgr = (struct jpeg_source_mgr *)dinfo->src;
+
+  if (source_mgr->bytes_in_buffer < num_bytes) 
+  {
+    source_mgr->next_input_byte = EOI_BUFFER;
+    source_mgr->bytes_in_buffer = 1;
+  } 
+  else 
+  {
+    source_mgr->next_input_byte += num_bytes;
+    source_mgr->bytes_in_buffer -= num_bytes;
+  }
+}
+
+static void term_source(j_decompress_ptr dinfo) { }
+
 static void
 jpeg_error_func(j_common_ptr jpeg_ptr)
 {
@@ -47,14 +79,31 @@ jpeg_error_func(j_common_ptr jpeg_ptr)
   mrb_raise(mrb, E_RUNTIME_ERROR, buf);
 }
 
+static void
+jpeg_memory_src(j_decompress_ptr dinfo, const JOCTET *data, size_t data_size)
+{
+  struct jpeg_source_mgr *source_mgr = (struct jpeg_source_mgr *)(*dinfo->mem->alloc_small)((j_common_ptr)dinfo, JPOOL_PERMANENT, sizeof(struct jpeg_source_mgr));
+
+  source_mgr->init_source = init_source;
+  source_mgr->fill_input_buffer = fill_input_buffer;
+  source_mgr->skip_input_data = skip_input_data;
+  source_mgr->resync_to_restart = jpeg_resync_to_restart;
+  source_mgr->term_source = term_source;
+
+  source_mgr->next_input_byte = (const JOCTET *)data;
+  source_mgr->bytes_in_buffer = data_size;
+
+  dinfo->src = source_mgr;
+}
+
 static mrb_value
-mrb_jpeg_read(mrb_state *mrb, mrb_value self)
+mrb_jpeg_decompress_common(mrb_state *mrb, mrb_value self, enum decompress_type dtype)
 {
   mrb_value arg_config_hash = mrb_nil_value();
-  mrb_value arg_filename = mrb_nil_value();
+  mrb_value arg_data = mrb_nil_value();
 
-  int argc = mrb_get_args(mrb, "S|H", &arg_filename, &arg_config_hash);
-  if (mrb_nil_p(arg_filename) || mrb_type(arg_filename) != MRB_TT_STRING) 
+  int argc = mrb_get_args(mrb, "S|H", &arg_data, &arg_config_hash);
+  if (mrb_nil_p(arg_data) || mrb_type(arg_data) != MRB_TT_STRING) 
   {
     mrb_raise(mrb, E_ARGUMENT_ERROR, "Invalid argument");
   }
@@ -70,13 +119,22 @@ mrb_jpeg_read(mrb_state *mrb, mrb_value self)
   dinfo.err = jpeg_std_error(&jpeg_error);
   dinfo.err->error_exit = jpeg_error_func;
 
-  FILE *fp = fopen(RSTRING_PTR(arg_filename), "r");
-  if(fp == NULL)
-  {
-    mrb_raise(mrb, E_RUNTIME_ERROR, "Could not open input file.");
-  }
   jpeg_create_decompress(&dinfo);
-  jpeg_stdio_src(&dinfo, fp);
+
+  if(dtype == FILE_SRC)
+  {
+    FILE *fp = fopen(RSTRING_PTR(arg_data), "r");
+    if(fp == NULL)
+    {
+      jpeg_destroy_decompress(&dinfo);
+      mrb_raise(mrb, E_RUNTIME_ERROR, "Could not open input file.");
+    }
+    jpeg_stdio_src(&dinfo, fp);
+  }
+  else
+  {
+    jpeg_memory_src(&dinfo, (const JOCTET *)RSTRING_PTR(arg_data), RSTRING_LEN(arg_data));
+  }
 
   jpeg_read_header(&dinfo, 1); 
 
@@ -123,6 +181,18 @@ mrb_jpeg_read(mrb_state *mrb, mrb_value self)
 }
 
 static mrb_value
+mrb_jpeg_decompress_data(mrb_state *mrb, mrb_value self)
+{
+  return mrb_jpeg_decompress_common(mrb, self, MEMORY_SRC);
+}
+
+static mrb_value
+mrb_jpeg_decompress_file(mrb_state *mrb, mrb_value self)
+{
+  return mrb_jpeg_decompress_common(mrb, self, FILE_SRC);
+}
+
+static mrb_value
 mrb_jpeg_width_get(mrb_state *mrb, mrb_value self)
 {
   return mrb_iv_get(mrb, self, mrb_intern(mrb, "width"));
@@ -144,7 +214,8 @@ void
 mrb_mruby_jpeg_gem_init(mrb_state* mrb) 
 {
   struct RClass *module_jpeg = mrb_define_module(mrb, "JPEG");
-  mrb_define_class_method(mrb, module_jpeg, "read", mrb_jpeg_read, ARGS_REQ(1));
+  mrb_define_class_method(mrb, module_jpeg, "decompress_file", mrb_jpeg_decompress_file, ARGS_REQ(1));
+  mrb_define_class_method(mrb, module_jpeg, "decompress_data", mrb_jpeg_decompress_data, ARGS_REQ(1));
 
   struct RClass *class_jpeg_image = mrb_define_class_under(mrb, module_jpeg, "JPEGImage", mrb->object_class);
   mrb_define_method(mrb, class_jpeg_image, "data", mrb_jpeg_data_get, ARGS_NONE());
