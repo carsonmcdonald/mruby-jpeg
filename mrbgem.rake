@@ -3,6 +3,9 @@ require 'tmpdir'
 MRuby::Gem::Specification.new('mruby-jpeg') do |spec|
   spec.license = 'MIT'
   spec.authors = 'Carson McDonald'
+  spec.version = '0.1.0'
+  spec.description = 'mruby wrapper for libjpeg.'
+  spec.homepage = 'https://github.com/carsonmcdonald/mruby-jpeg'
 
   spec.linker.libraries << 'jpeg'
 
