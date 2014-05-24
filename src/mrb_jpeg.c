@@ -32,7 +32,7 @@
 
 #include <jpeglib.h>
 
-#define HASH_TRUE(mrb, hash, value) (mrb_obj_equal(mrb, mrb_hash_get(mrb, hash, mrb_symbol_value(mrb_intern(mrb, value))), mrb_true_value()))
+#define HASH_TRUE(mrb, hash, value) (mrb_obj_equal(mrb, mrb_hash_get(mrb, hash, mrb_symbol_value(mrb_intern_lit(mrb, value))), mrb_true_value()))
 
 enum decompress_type {FILE_SRC, MEMORY_SRC};
 
@@ -169,11 +169,11 @@ mrb_jpeg_decompress_common(mrb_state *mrb, mrb_value self, enum decompress_type 
   }
 
   struct RClass* module_jpeg = mrb_class_get(mrb, "JPEG");
-  struct RClass* class_jpeg_image = mrb_class_ptr(mrb_const_get(mrb, mrb_obj_value(module_jpeg), mrb_intern(mrb, "JPEGImage")));
+  struct RClass* class_jpeg_image = mrb_class_ptr(mrb_const_get(mrb, mrb_obj_value(module_jpeg), mrb_intern_lit(mrb, "JPEGImage")));
   mrb_value ivar = mrb_class_new_instance(mrb, 0, NULL, class_jpeg_image);
-  mrb_iv_set(mrb, ivar, mrb_intern(mrb, "data"), mrb_str_new(mrb, jpeg_data, scanline_size * dinfo.image_height));
-  mrb_iv_set(mrb, ivar, mrb_intern(mrb, "width"), mrb_fixnum_value(dinfo.image_width));
-  mrb_iv_set(mrb, ivar, mrb_intern(mrb, "height"), mrb_fixnum_value(dinfo.image_height));
+  mrb_iv_set(mrb, ivar, mrb_intern_lit(mrb, "data"), mrb_str_new(mrb, jpeg_data, scanline_size * dinfo.image_height));
+  mrb_iv_set(mrb, ivar, mrb_intern_lit(mrb, "width"), mrb_fixnum_value(dinfo.image_width));
+  mrb_iv_set(mrb, ivar, mrb_intern_lit(mrb, "height"), mrb_fixnum_value(dinfo.image_height));
 
   jpeg_finish_decompress(&dinfo);
   jpeg_destroy_decompress(&dinfo);
@@ -196,19 +196,19 @@ mrb_jpeg_decompress_file(mrb_state *mrb, mrb_value self)
 static mrb_value
 mrb_jpeg_width_get(mrb_state *mrb, mrb_value self)
 {
-  return mrb_iv_get(mrb, self, mrb_intern(mrb, "width"));
+  return mrb_iv_get(mrb, self, mrb_intern_lit(mrb, "width"));
 }
 
 static mrb_value
 mrb_jpeg_height_get(mrb_state *mrb, mrb_value self)
 {
-  return mrb_iv_get(mrb, self, mrb_intern(mrb, "height"));
+  return mrb_iv_get(mrb, self, mrb_intern_lit(mrb, "height"));
 }
 
 static mrb_value
 mrb_jpeg_data_get(mrb_state *mrb, mrb_value self)
 {
-  return mrb_iv_get(mrb, self, mrb_intern(mrb, "data"));
+  return mrb_iv_get(mrb, self, mrb_intern_lit(mrb, "data"));
 }
 
 void
