@@ -177,7 +177,7 @@ mrb_jpeg_decompress_common(mrb_state *mrb, mrb_value self, enum decompress_type 
     jpeg_read_scanlines(&dinfo, &jpeg_row, 1);
   }
 
-  module_jpeg = mrb_class_get(mrb, "JPEG");
+  module_jpeg = mrb_module_get(mrb, "JPEG");
   class_jpeg_image = mrb_class_ptr(mrb_const_get(mrb, mrb_obj_value(module_jpeg), mrb_intern_lit(mrb, "JPEGImage")));
   ivar = mrb_class_new_instance(mrb, 0, NULL, class_jpeg_image);
   mrb_iv_set(mrb, ivar, mrb_intern_lit(mrb, "data"), mrb_str_new(mrb, jpeg_data, scanline_size * dinfo.image_height));
