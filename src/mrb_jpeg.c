@@ -69,14 +69,17 @@ static void term_source(j_decompress_ptr dinfo) { }
 static void
 jpeg_error_func(j_common_ptr jpeg_ptr)
 {
+  struct jpeg_error_mgr *err;
+  char buf[JMSG_LENGTH_MAX];
+  mrb_state *mrb;
+
   jpeg_abort(jpeg_ptr);
 
-  struct jpeg_error_mgr *err = (struct jpeg_error_mgr *)jpeg_ptr->err;
-  char buf[JMSG_LENGTH_MAX];
+  err = (struct jpeg_error_mgr *)jpeg_ptr->err;
 
   err->format_message(jpeg_ptr, buf);
 
-  mrb_state *mrb = (mrb_state *)jpeg_ptr->client_data;
+  mrb = (mrb_state *)jpeg_ptr->client_data;
   mrb_raise(mrb, E_RUNTIME_ERROR, buf);
 }
 
@@ -100,6 +103,15 @@ jpeg_memory_src(j_decompress_ptr dinfo, const JOCTET *data, size_t data_size)
 static mrb_value
 mrb_jpeg_decompress_common(mrb_state *mrb, mrb_value self, enum decompress_type dtype)
 {
+  struct jpeg_decompress_struct dinfo;
+  struct jpeg_error_mgr jpeg_error;
+  long scanline_size;
+  void *jpeg_data;
+  int row = 0;
+  struct RClass* module_jpeg;
+  struct RClass* class_jpeg_image;
+  mrb_value ivar;
+
   mrb_value arg_config_hash = mrb_nil_value();
   mrb_value arg_data = mrb_nil_value();
 
@@ -113,10 +125,8 @@ mrb_jpeg_decompress_common(mrb_state *mrb, mrb_value self, enum decompress_type 
     mrb_raise(mrb, E_ARGUMENT_ERROR, "Invalid argument");
   }
   
-  struct jpeg_decompress_struct dinfo;
   dinfo.client_data = mrb;
 
-  struct jpeg_error_mgr jpeg_error;
   dinfo.err = jpeg_std_error(&jpeg_error);
   dinfo.err->error_exit = jpeg_error_func;
 
@@ -158,19 +168,18 @@ mrb_jpeg_decompress_common(mrb_state *mrb, mrb_value self, enum decompress_type 
 
   jpeg_start_decompress(&dinfo);
 
-  long scanline_size = dinfo.image_width * dinfo.output_components;
-  void *jpeg_data = malloc(scanline_size * dinfo.image_height);
+  scanline_size = dinfo.image_width * dinfo.output_components;
+  jpeg_data = malloc(scanline_size * dinfo.image_height);
 
-  int row = 0;
   for(row = 0; row < dinfo.image_height; row++)
   {
     JSAMPROW jpeg_row = (JSAMPROW)(jpeg_data + (scanline_size * row));
     jpeg_read_scanlines(&dinfo, &jpeg_row, 1);
   }
 
-  struct RClass* module_jpeg = mrb_class_get(mrb, "JPEG");
-  struct RClass* class_jpeg_image = mrb_class_ptr(mrb_const_get(mrb, mrb_obj_value(module_jpeg), mrb_intern_lit(mrb, "JPEGImage")));
-  mrb_value ivar = mrb_class_new_instance(mrb, 0, NULL, class_jpeg_image);
+  module_jpeg = mrb_class_get(mrb, "JPEG");
+  class_jpeg_image = mrb_class_ptr(mrb_const_get(mrb, mrb_obj_value(module_jpeg), mrb_intern_lit(mrb, "JPEGImage")));
+  ivar = mrb_class_new_instance(mrb, 0, NULL, class_jpeg_image);
   mrb_iv_set(mrb, ivar, mrb_intern_lit(mrb, "data"), mrb_str_new(mrb, jpeg_data, scanline_size * dinfo.image_height));
   mrb_iv_set(mrb, ivar, mrb_intern_lit(mrb, "width"), mrb_fixnum_value(dinfo.image_width));
   mrb_iv_set(mrb, ivar, mrb_intern_lit(mrb, "height"), mrb_fixnum_value(dinfo.image_height));
@@ -214,11 +223,14 @@ mrb_jpeg_data_get(mrb_state *mrb, mrb_value self)
 void
 mrb_mruby_jpeg_gem_init(mrb_state* mrb) 
 {
-  struct RClass *module_jpeg = mrb_define_module(mrb, "JPEG");
+  struct RClass *class_jpeg_image;
+  struct RClass *module_jpeg;
+
+  module_jpeg = mrb_define_module(mrb, "JPEG");
   mrb_define_class_method(mrb, module_jpeg, "decompress_file", mrb_jpeg_decompress_file, ARGS_REQ(1));
   mrb_define_class_method(mrb, module_jpeg, "decompress_data", mrb_jpeg_decompress_data, ARGS_REQ(1));
 
-  struct RClass *class_jpeg_image = mrb_define_class_under(mrb, module_jpeg, "JPEGImage", mrb->object_class);
+  class_jpeg_image = mrb_define_class_under(mrb, module_jpeg, "JPEGImage", mrb->object_class);
   mrb_define_method(mrb, class_jpeg_image, "data", mrb_jpeg_data_get, ARGS_NONE());
   mrb_define_method(mrb, class_jpeg_image, "width", mrb_jpeg_width_get, ARGS_NONE());
   mrb_define_method(mrb, class_jpeg_image, "height", mrb_jpeg_height_get, ARGS_NONE());
